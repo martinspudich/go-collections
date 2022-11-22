@@ -14,7 +14,7 @@ func TestTimeExpiredMap(t *testing.T) {
 	var key = "1"
 	var value = "test 1"
 
-	tmap := NewTimeExpiredMap(1 * time.Second)
+	tmap := NewTimeExpiredMap[string, string](1 * time.Second)
 	defer tmap.Discard()
 
 	t.Run("Size", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestLoad(t *testing.T) {
 	t.Parallel()
 	var count = 10000
 
-	tmap := NewTimeExpiredMap(2 * time.Second)
+	tmap := NewTimeExpiredMap[string, string](2 * time.Second)
 	defer tmap.Discard()
 
 	for i := 1; i < count+1; i++ {
@@ -89,7 +89,7 @@ func TestTimeExpiredMap_Del(t *testing.T) {
 	var want int
 	var got int
 
-	tmap := NewTimeExpiredMap(2 * time.Second)
+	tmap := NewTimeExpiredMap[string, string](2 * time.Second)
 	defer tmap.Discard()
 
 	tmap.Add("1", "test 1")
@@ -116,10 +116,10 @@ func TestTimeExpiredMap_AddWithDuration(t *testing.T) {
 	var want int
 	var got int
 
-	tmap := NewTimeExpiredMap(1 * time.Second)
+	tmap := NewTimeExpiredMap[string, string](1 * time.Second)
 	defer tmap.Discard()
 
-	tmap.AddWithDuration("1", "test 1", time.Duration(5*time.Second))
+	tmap.AddWithDuration("1", "test 1", 5*time.Second)
 
 	want = 1
 	got = tmap.Size()
