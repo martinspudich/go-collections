@@ -19,7 +19,8 @@ import (
 func main() {
 
     tmap := goc.NewTimeExpiredMap(2 * time.Second) // creates new TimeExpiredMap, it starts new goroutine
-    defer tmap.Discard() // stops goroutine and discards internal data map
+    defer tmap.Discard()                           // stops goroutine and discards internal data map
 
     tmap.Add("1", "test 1") // adds element with key "1" and value "test 1"
+}
 ```
