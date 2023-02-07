@@ -148,6 +148,8 @@ func TestTimeExpiredList(t *testing.T) {
 
 	want := "value1"
 	tlist := NewTimeExpiredList[string](1 * time.Second)
+	defer tlist.Discard()
+
 	tlist.Add(want)
 
 	size := tlist.Size()
@@ -174,6 +176,8 @@ func TestTimeExpiredList_GetAll(t *testing.T) {
 	t.Parallel()
 
 	tlist := NewTimeExpiredList[string](5 * time.Second)
+	defer tlist.Discard()
+
 	tlist.Add("value1")
 	tlist.Add("value2")
 	tlist.Add("value3")
@@ -190,6 +194,8 @@ func TestTimeExpiredList_Del(t *testing.T) {
 	t.Parallel()
 
 	tlist := NewTimeExpiredList[string](5 * time.Second)
+	defer tlist.Discard()
+
 	tlist.Add("value1")
 	tlist.Add("value2")
 	tlist.Add("value3")

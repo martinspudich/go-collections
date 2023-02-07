@@ -99,6 +99,8 @@ func (m *timeExpiredMap[K, V]) Size() int {
 // Discard method stops the goroutine for removing elements and discards data in internal map.
 func (m *timeExpiredMap[K, V]) Discard() {
 	m.quitChan <- struct{}{}
+	m.Lock()
+	defer m.Unlock()
 	m.data = nil
 }
 
@@ -133,6 +135,7 @@ type TimeExpiredList[V any] interface {
 	Get(index int) (V, error)
 	GetAll() []V
 	Del(i int) error
+	Discard()
 	Size() int
 }
 
@@ -143,23 +146,28 @@ type timeExpiredList[V any] struct {
 	quitChan chan struct{}
 }
 
+// NewTimeExpiredList creates instance of TimeExpiredList interface. It runs goroutine for removing expired elements.
 func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
 	tlist := &timeExpiredList[V]{
 		duration: duration,
 		data:     []expiredElement[V]{},
+		quitChan: make(chan struct{}),
 	}
 
+	// Run goroutine for removing expired elements.
 	go tlist.run()
 
 	return tlist
 }
 
+// Add method add element to TimeExpiredList
 func (l *timeExpiredList[V]) Add(value V) {
 	l.Lock()
 	defer l.Unlock()
 	l.data = append(l.data, expiredElement[V]{expiredAt: time.Now().Add(l.duration), data: value})
 }
 
+// Get returns element by index.
 func (l *timeExpiredList[V]) Get(i int) (V, error) {
 	var result V
 	if i < 0 && i >= len(l.data) {
@@ -169,6 +177,7 @@ func (l *timeExpiredList[V]) Get(i int) (V, error) {
 	return result, nil
 }
 
+// GetAll returns TimeExpiredElements values in slice.
 func (l *timeExpiredList[V]) GetAll() []V {
 	var result []V
 	for _, v := range l.data {
@@ -177,6 +186,7 @@ func (l *timeExpiredList[V]) GetAll() []V {
 	return result
 }
 
+// Del removes element by index.
 func (l *timeExpiredList[V]) Del(i int) error {
 	if i < 0 && i >= len(l.data) {
 		return ErrIndexOutOfBound
@@ -188,8 +198,17 @@ func (l *timeExpiredList[V]) Del(i int) error {
 	return nil
 }
 
+// Size returns size of the list
 func (l *timeExpiredList[V]) Size() int {
 	return len(l.data)
+}
+
+// Discard method stops the goroutine for removing elements and discards data in internal slice.
+func (l *timeExpiredList[V]) Discard() {
+	l.quitChan <- struct{}{}
+	l.Lock()
+	defer l.Unlock()
+	l.data = nil
 }
 
 // run method runs the goroutine for removing expired elements.
