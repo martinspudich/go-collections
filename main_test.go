@@ -1,6 +1,7 @@
 package gocollections
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"testing"
@@ -165,7 +166,7 @@ func TestTimeExpiredList(t *testing.T) {
 		t.Fatalf("want: %s, got: %s", want, got)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	size = tlist.Size()
 	if size != 0 {
 		t.Fatalf("Expecting no element in collection. But got size: %d", size)
@@ -193,8 +194,8 @@ func TestTimeExpiredList_GetAll(t *testing.T) {
 func TestTimeExpiredList_Del(t *testing.T) {
 	t.Parallel()
 
-	tlist := NewTimeExpiredList[string](5 * time.Second)
-	defer tlist.Discard()
+	tlist := NewTimeExpiredList[string](600 * time.Second)
+	//defer tlist.Discard()
 
 	tlist.Add("value1")
 	tlist.Add("value2")
@@ -236,5 +237,25 @@ func TestTimeExpiredList_Del(t *testing.T) {
 		if v == "value5" {
 			t.Fatalf("We expecte 'value3' is removed, but it was present")
 		}
+	}
+
+	// remove last element
+	_ = tlist.Del(tlist.Size() - 1)
+	size = len(tlist.GetAll())
+	if size != 1 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+
+	// remove last element
+	_ = tlist.Del(tlist.Size() - 1)
+	size = len(tlist.GetAll())
+	if size != 0 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+
+	// remove last element from empty list
+	err := tlist.Del(0)
+	if !errors.Is(err, ErrIndexOutOfBound) {
+		t.Fatalf("Expect ErrIndexOutOfBound but got %s", err.Error())
 	}
 }

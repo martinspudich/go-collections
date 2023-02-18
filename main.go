@@ -188,7 +188,7 @@ func (l *timeExpiredList[V]) GetAll() []V {
 
 // Del removes element by index.
 func (l *timeExpiredList[V]) Del(i int) error {
-	if i < 0 && i >= len(l.data) {
+	if i < 0 || i >= len(l.data) {
 		return ErrIndexOutOfBound
 	}
 
