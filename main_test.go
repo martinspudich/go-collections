@@ -8,6 +8,122 @@ import (
 	"time"
 )
 
+func TestTimeExpiredList(t *testing.T) {
+	t.Parallel()
+
+	want := "value1"
+	tlist := NewTimeExpiredList[string](1 * time.Second)
+	defer tlist.Discard()
+
+	tlist.Add(want)
+
+	size := tlist.Size()
+	if size != 1 {
+		t.Fatalf("Expext one element in collection. But size is: %d", size)
+	}
+
+	got, err := tlist.Get(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("want: %s, got: %s", want, got)
+	}
+
+	time.Sleep(5 * time.Second)
+	size = tlist.Size()
+	if size != 0 {
+		t.Fatalf("Expecting no element in collection. But got size: %d", size)
+	}
+}
+
+func TestTimeExpiredList_GetAll(t *testing.T) {
+	t.Parallel()
+
+	tlist := NewTimeExpiredList[string](5 * time.Second)
+	defer tlist.Discard()
+
+	tlist.Add("value1")
+	tlist.Add("value2")
+	tlist.Add("value3")
+	tlist.Add("value4")
+	tlist.Add("value5")
+
+	values := tlist.GetAll()
+	if len(values) != 5 {
+		t.Fatalf("Expected 5 values. Got: %d", len(values))
+	}
+}
+
+func TestTimeExpiredList_Del(t *testing.T) {
+	t.Parallel()
+
+	tlist := NewTimeExpiredList[string](600 * time.Second)
+	//defer tlist.Discard()
+
+	tlist.Add("value1")
+	tlist.Add("value2")
+	tlist.Add("value3")
+	tlist.Add("value4")
+	tlist.Add("value5")
+
+	// remove value3 element
+	_ = tlist.Del(2)
+	size := len(tlist.GetAll())
+	if size != 4 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+	for _, v := range tlist.GetAll() {
+		if v == "value3" {
+			t.Fatalf("We expecte 'value3' is removed, but it was present")
+		}
+	}
+
+	// remove first element value1
+	_ = tlist.Del(0)
+	size = len(tlist.GetAll())
+	if size != 3 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+	for _, v := range tlist.GetAll() {
+		if v == "value1" {
+			t.Fatalf("We expecte 'value3' is removed, but it was present")
+		}
+	}
+
+	// remove last element value5
+	_ = tlist.Del(tlist.Size() - 1)
+	size = len(tlist.GetAll())
+	if size != 2 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+	for _, v := range tlist.GetAll() {
+		if v == "value5" {
+			t.Fatalf("We expecte 'value3' is removed, but it was present")
+		}
+	}
+
+	// remove last element
+	_ = tlist.Del(tlist.Size() - 1)
+	size = len(tlist.GetAll())
+	if size != 1 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+
+	// remove last element
+	_ = tlist.Del(tlist.Size() - 1)
+	size = len(tlist.GetAll())
+	if size != 0 {
+		t.Fatalf("Expect size to be 4. But got: %d", size)
+	}
+
+	// remove last element from empty list
+	err := tlist.Del(0)
+	if !errors.Is(err, ErrIndexOutOfBound) {
+		t.Fatalf("Expect ErrIndexOutOfBound but got %s", err.Error())
+	}
+}
+
 func TestTimeExpiredMap(t *testing.T) {
 	t.Parallel()
 	var want int
@@ -141,121 +257,5 @@ func TestTimeExpiredMap_AddWithDuration(t *testing.T) {
 	got = tmap.Size()
 	if want != got {
 		t.Errorf("want: %d, got: %d", want, got)
-	}
-}
-
-func TestTimeExpiredList(t *testing.T) {
-	t.Parallel()
-
-	want := "value1"
-	tlist := NewTimeExpiredList[string](1 * time.Second)
-	defer tlist.Discard()
-
-	tlist.Add(want)
-
-	size := tlist.Size()
-	if size != 1 {
-		t.Fatalf("Expext one element in collection. But size is: %d", size)
-	}
-
-	got, err := tlist.Get(0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != want {
-		t.Fatalf("want: %s, got: %s", want, got)
-	}
-
-	time.Sleep(5 * time.Second)
-	size = tlist.Size()
-	if size != 0 {
-		t.Fatalf("Expecting no element in collection. But got size: %d", size)
-	}
-}
-
-func TestTimeExpiredList_GetAll(t *testing.T) {
-	t.Parallel()
-
-	tlist := NewTimeExpiredList[string](5 * time.Second)
-	defer tlist.Discard()
-
-	tlist.Add("value1")
-	tlist.Add("value2")
-	tlist.Add("value3")
-	tlist.Add("value4")
-	tlist.Add("value5")
-
-	values := tlist.GetAll()
-	if len(values) != 5 {
-		t.Fatalf("Expected 5 values. Got: %d", len(values))
-	}
-}
-
-func TestTimeExpiredList_Del(t *testing.T) {
-	t.Parallel()
-
-	tlist := NewTimeExpiredList[string](600 * time.Second)
-	//defer tlist.Discard()
-
-	tlist.Add("value1")
-	tlist.Add("value2")
-	tlist.Add("value3")
-	tlist.Add("value4")
-	tlist.Add("value5")
-
-	// remove value3 element
-	_ = tlist.Del(2)
-	size := len(tlist.GetAll())
-	if size != 4 {
-		t.Fatalf("Expect size to be 4. But got: %d", size)
-	}
-	for _, v := range tlist.GetAll() {
-		if v == "value3" {
-			t.Fatalf("We expecte 'value3' is removed, but it was present")
-		}
-	}
-
-	// remove first element value1
-	_ = tlist.Del(0)
-	size = len(tlist.GetAll())
-	if size != 3 {
-		t.Fatalf("Expect size to be 4. But got: %d", size)
-	}
-	for _, v := range tlist.GetAll() {
-		if v == "value1" {
-			t.Fatalf("We expecte 'value3' is removed, but it was present")
-		}
-	}
-
-	// remove last element value5
-	_ = tlist.Del(tlist.Size() - 1)
-	size = len(tlist.GetAll())
-	if size != 2 {
-		t.Fatalf("Expect size to be 4. But got: %d", size)
-	}
-	for _, v := range tlist.GetAll() {
-		if v == "value5" {
-			t.Fatalf("We expecte 'value3' is removed, but it was present")
-		}
-	}
-
-	// remove last element
-	_ = tlist.Del(tlist.Size() - 1)
-	size = len(tlist.GetAll())
-	if size != 1 {
-		t.Fatalf("Expect size to be 4. But got: %d", size)
-	}
-
-	// remove last element
-	_ = tlist.Del(tlist.Size() - 1)
-	size = len(tlist.GetAll())
-	if size != 0 {
-		t.Fatalf("Expect size to be 4. But got: %d", size)
-	}
-
-	// remove last element from empty list
-	err := tlist.Del(0)
-	if !errors.Is(err, ErrIndexOutOfBound) {
-		t.Fatalf("Expect ErrIndexOutOfBound but got %s", err.Error())
 	}
 }

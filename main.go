@@ -6,8 +6,125 @@ import (
 	"time"
 )
 
-var ErrKeyNotFound = errors.New("key not found")
-var ErrIndexOutOfBound = errors.New("index out of bound")
+var (
+	ErrKeyNotFound     = errors.New("key not found")
+	ErrIndexOutOfBound = errors.New("index out of bound")
+	ErrExpired         = errors.New("element expired") // When an element is present in the collection but the validity time expires.
+)
+
+/*
+Time Expired List
+*/
+
+// TimeExpiredList is a list collection which values expires in time.
+type TimeExpiredList[V any] interface {
+	Add(value V)
+	Get(index int) (V, error)
+	GetAll() []V
+	Del(i int) error
+	Discard()
+	Size() int
+}
+
+type timeExpiredList[V any] struct {
+	sync.Mutex
+	duration time.Duration
+	data     []expiredElement[V]
+	quitChan chan struct{}
+}
+
+// NewTimeExpiredList creates instance of TimeExpiredList interface. It runs goroutine for removing expired elements.
+func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
+	tlist := &timeExpiredList[V]{
+		duration: duration,
+		data:     []expiredElement[V]{},
+		quitChan: make(chan struct{}),
+	}
+
+	// Run goroutine for removing expired elements.
+	go tlist.run()
+
+	return tlist
+}
+
+// Add method add element to TimeExpiredList
+func (l *timeExpiredList[V]) Add(value V) {
+	l.Lock()
+	defer l.Unlock()
+	l.data = append(l.data, expiredElement[V]{expiredAt: time.Now().Add(l.duration), data: value})
+}
+
+// Get returns element by index.
+func (l *timeExpiredList[V]) Get(i int) (V, error) {
+	var result V
+	if i < 0 && i >= len(l.data) {
+		return result, ErrIndexOutOfBound
+	}
+	if l.data[i].expiredAt.Before(time.Now()) {
+		return result, ErrExpired
+	}
+	result = l.data[i].data
+	return result, nil
+}
+
+// GetAll returns TimeExpiredElements values in slice.
+func (l *timeExpiredList[V]) GetAll() []V {
+	var result []V
+	for _, v := range l.data {
+		if v.expiredAt.Before(time.Now()) {
+			// skip element if expired.
+			continue
+		}
+		result = append(result, v.data)
+	}
+	return result
+}
+
+// Del removes element by index.
+func (l *timeExpiredList[V]) Del(i int) error {
+	if i < 0 || i >= len(l.data) {
+		return ErrIndexOutOfBound
+	}
+
+	l.Lock()
+	defer l.Unlock()
+	l.data = append(l.data[:i], l.data[i+1:]...)
+	return nil
+}
+
+// Size returns size of the list
+func (l *timeExpiredList[V]) Size() int {
+	return len(l.data)
+}
+
+// Discard method stops the goroutine for removing elements and discards data in internal slice.
+func (l *timeExpiredList[V]) Discard() {
+	l.quitChan <- struct{}{}
+	l.Lock()
+	defer l.Unlock()
+	l.data = nil
+}
+
+// run method runs the goroutine for removing expired elements.
+func (l *timeExpiredList[V]) run() {
+	for {
+		select {
+		case <-time.After(1 * time.Second):
+			l.removeExpired()
+		case <-l.quitChan:
+			return
+		}
+	}
+}
+
+// removeExpired method removes expired elements in list.
+func (l *timeExpiredList[V]) removeExpired() {
+	for i, val := range l.data {
+		if val.expiredAt.Before(time.Now()) {
+			_ = l.Del(i)
+		}
+	}
+}
 
 /*
 Time Expired Map
@@ -71,6 +188,9 @@ func (m *timeExpiredMap[K, V]) Get(key K) (V, error) {
 	if !m.Contains(key) {
 		return result, ErrKeyNotFound
 	}
+	if m.data[key].expiredAt.Before(time.Now()) {
+		return result, ErrExpired
+	}
 	return m.data[key].data, nil
 }
 
@@ -121,113 +241,6 @@ func (m *timeExpiredMap[K, V]) removeExpired() {
 	for key, val := range m.data {
 		if val.expiredAt.Before(time.Now()) {
 			delete(m.data, key)
-		}
-	}
-}
-
-/*
-Time Expired List
-*/
-
-// TimeExpiredList is a list collection which values expires in time.
-type TimeExpiredList[V any] interface {
-	Add(value V)
-	Get(index int) (V, error)
-	GetAll() []V
-	Del(i int) error
-	Discard()
-	Size() int
-}
-
-type timeExpiredList[V any] struct {
-	sync.Mutex
-	duration time.Duration
-	data     []expiredElement[V]
-	quitChan chan struct{}
-}
-
-// NewTimeExpiredList creates instance of TimeExpiredList interface. It runs goroutine for removing expired elements.
-func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
-	tlist := &timeExpiredList[V]{
-		duration: duration,
-		data:     []expiredElement[V]{},
-		quitChan: make(chan struct{}),
-	}
-
-	// Run goroutine for removing expired elements.
-	go tlist.run()
-
-	return tlist
-}
-
-// Add method add element to TimeExpiredList
-func (l *timeExpiredList[V]) Add(value V) {
-	l.Lock()
-	defer l.Unlock()
-	l.data = append(l.data, expiredElement[V]{expiredAt: time.Now().Add(l.duration), data: value})
-}
-
-// Get returns element by index.
-func (l *timeExpiredList[V]) Get(i int) (V, error) {
-	var result V
-	if i < 0 && i >= len(l.data) {
-		return result, ErrIndexOutOfBound
-	}
-	result = l.data[i].data
-	return result, nil
-}
-
-// GetAll returns TimeExpiredElements values in slice.
-func (l *timeExpiredList[V]) GetAll() []V {
-	var result []V
-	for _, v := range l.data {
-		result = append(result, v.data)
-	}
-	return result
-}
-
-// Del removes element by index.
-func (l *timeExpiredList[V]) Del(i int) error {
-	if i < 0 || i >= len(l.data) {
-		return ErrIndexOutOfBound
-	}
-
-	l.Lock()
-	defer l.Unlock()
-	l.data = append(l.data[:i], l.data[i+1:]...)
-	return nil
-}
-
-// Size returns size of the list
-func (l *timeExpiredList[V]) Size() int {
-	return len(l.data)
-}
-
-// Discard method stops the goroutine for removing elements and discards data in internal slice.
-func (l *timeExpiredList[V]) Discard() {
-	l.quitChan <- struct{}{}
-	l.Lock()
-	defer l.Unlock()
-	l.data = nil
-}
-
-// run method runs the goroutine for removing expired elements.
-func (l *timeExpiredList[V]) run() {
-	for {
-		select {
-		case <-time.After(1 * time.Second):
-			l.removeExpired()
-		case <-l.quitChan:
-			return
-		}
-	}
-}
-
-// removeExpired method removes expired elements in list.
-func (l *timeExpiredList[V]) removeExpired() {
-	for i, val := range l.data {
-		if val.expiredAt.Before(time.Now()) {
-			_ = l.Del(i)
 		}
 	}
 }
