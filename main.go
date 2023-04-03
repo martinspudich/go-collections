@@ -224,7 +224,11 @@ func (m *timeExpiredMap[K, V]) Del(key K) error {
 
 // Contains method returns true if key is in the map. Else return false.
 func (m *timeExpiredMap[K, V]) Contains(key K) bool {
-	_, found := m.data[key]
+	e, found := m.data[key]
+	if e.expiredAt.Before(time.Now()) {
+		// if element expire, then return false
+		return false
+	}
 	return found
 }
 

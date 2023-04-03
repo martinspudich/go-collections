@@ -176,6 +176,10 @@ func TestTimeExpiredMap(t *testing.T) {
 		if want != got {
 			t.Errorf("want: %d, got: %d", want, got)
 		}
+		c := tmap.Contains(key)
+		if c {
+			t.Error("contains, key is in the map, but should expire")
+		}
 	})
 }
 
