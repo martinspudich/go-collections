@@ -6,11 +6,22 @@ import (
 	"time"
 )
 
+const (
+	// CleanJobInterval How often remove expired elements from collections. If it's too often, ex. 1 second and there
+	// is too many elements, than it will cause performance issue.
+	CleanJobInterval = 60 * time.Second
+)
+
 var (
 	ErrKeyNotFound     = errors.New("key not found")
 	ErrIndexOutOfBound = errors.New("index out of bound")
 	ErrExpired         = errors.New("element expired") // When an element is present in the collection but the validity time expires.
 )
+
+type expiredElement[V any] struct {
+	data      V
+	expiredAt time.Time
+}
 
 /*
 Time Expired List
@@ -28,17 +39,19 @@ type TimeExpiredList[V any] interface {
 
 type timeExpiredList[V any] struct {
 	sync.Mutex
-	duration time.Duration
-	data     []expiredElement[V]
-	quitChan chan struct{}
+	duration   time.Duration
+	data       []expiredElement[V]
+	dataString []V
+	quitChan   chan struct{}
 }
 
 // NewTimeExpiredList creates instance of TimeExpiredList interface. It runs goroutine for removing expired elements.
 func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
 	tlist := &timeExpiredList[V]{
-		duration: duration,
-		data:     []expiredElement[V]{},
-		quitChan: make(chan struct{}),
+		duration:   duration,
+		data:       []expiredElement[V]{},
+		dataString: []V{},
+		quitChan:   make(chan struct{}),
 	}
 
 	// Run goroutine for removing expired elements.
@@ -51,7 +64,9 @@ func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
 func (l *timeExpiredList[V]) Add(value V) {
 	l.Lock()
 	defer l.Unlock()
+	//l.dataString = append(l.dataString, value)
 	l.data = append(l.data, expiredElement[V]{expiredAt: time.Now().Add(l.duration), data: value})
+	//l.data = append(l.data, expiredElement[V]{})
 }
 
 // Get returns element by index.
@@ -94,7 +109,14 @@ func (l *timeExpiredList[V]) Del(i int) error {
 
 // Size returns size of the list
 func (l *timeExpiredList[V]) Size() int {
-	return len(l.data)
+	var count = 0
+	for _, e := range l.data {
+		// Don't count if element already expired.
+		if e.expiredAt.After(time.Now()) {
+			count++
+		}
+	}
+	return count
 }
 
 // Discard method stops the goroutine for removing elements and discards data in internal slice.
@@ -109,7 +131,7 @@ func (l *timeExpiredList[V]) Discard() {
 func (l *timeExpiredList[V]) run() {
 	for {
 		select {
-		case <-time.After(1 * time.Second):
+		case <-time.After(CleanJobInterval):
 			l.removeExpired()
 		case <-l.quitChan:
 			return
@@ -141,11 +163,6 @@ type TimeExpiredMap[K comparable, V any] interface {
 	Contains(key K) bool
 	Size() int
 	Discard()
-}
-
-type expiredElement[V any] struct {
-	data      V
-	expiredAt time.Time
 }
 
 type timeExpiredMap[K comparable, V any] struct {
@@ -213,7 +230,14 @@ func (m *timeExpiredMap[K, V]) Contains(key K) bool {
 
 // Size method returns size of the map.
 func (m *timeExpiredMap[K, V]) Size() int {
-	return len(m.data)
+	var count = 0
+	for _, d := range m.data {
+		// Don't count if element already expired.
+		if d.expiredAt.After(time.Now()) {
+			count++
+		}
+	}
+	return count
 }
 
 // Discard method stops the goroutine for removing elements and discards data in internal map.
@@ -228,7 +252,7 @@ func (m *timeExpiredMap[K, V]) Discard() {
 func (m *timeExpiredMap[K, V]) run() {
 	for {
 		select {
-		case <-time.After(1 * time.Second):
+		case <-time.After(CleanJobInterval):
 			m.removeExpired()
 		case <-m.quitChan:
 			return
