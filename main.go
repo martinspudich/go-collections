@@ -141,11 +141,15 @@ func (l *timeExpiredList[V]) run() {
 
 // removeExpired method removes expired elements in list.
 func (l *timeExpiredList[V]) removeExpired() {
-	for i, val := range l.data {
-		if val.expiredAt.Before(time.Now()) {
-			_ = l.Del(i)
+	var newData []expiredElement[V]
+	l.Lock()
+	defer l.Unlock()
+	for _, val := range l.data {
+		if val.expiredAt.After(time.Now()) {
+			newData = append(newData, val)
 		}
 	}
+	l.data = newData
 }
 
 /*
