@@ -38,15 +38,17 @@ func BenchmarkTimeExpiredList_Expired(b *testing.B) {
 		dataString: []string{},
 		quitChan:   make(chan struct{}),
 	}
-	//defer tlist.Discard()
-	fmt.Println("Running with N = ", b.N)
-	fmt.Println("Add elements")
 	for i := 0; i < b.N; i++ {
 		tlist.Add(fmt.Sprintf("test-%d", i))
 	}
-	fmt.Println("Del elements")
 	tlist.removeExpired()
-	//for i := 0; i < b.N; i++ {
-	//	tlist.Del(i)
-	//}
+}
+
+func BenchmarkTimeExpiredList_Size(b *testing.B) {
+	tlist := NewTimeExpiredList[string](10 * time.Millisecond)
+	defer tlist.Discard()
+	for i := 0; i < b.N; i++ {
+		tlist.Add(fmt.Sprintf("test-%d", i))
+	}
+	tlist.Size()
 }

@@ -129,9 +129,10 @@ func (l *timeExpiredList[V]) Discard() {
 
 // run method runs the goroutine for removing expired elements.
 func (l *timeExpiredList[V]) run() {
+	timer := time.NewTimer(CleanJobInterval)
 	for {
 		select {
-		case <-time.After(CleanJobInterval):
+		case <-timer.C:
 			l.removeExpired()
 		case <-l.quitChan:
 			return
@@ -258,9 +259,10 @@ func (m *timeExpiredMap[K, V]) Discard() {
 
 // run method runs the goroutine for removing expired elements.
 func (m *timeExpiredMap[K, V]) run() {
+	timer := time.NewTimer(CleanJobInterval)
 	for {
 		select {
-		case <-time.After(CleanJobInterval):
+		case <-timer.C:
 			m.removeExpired()
 		case <-m.quitChan:
 			return
