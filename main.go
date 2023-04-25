@@ -2,6 +2,7 @@ package gocollections
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -129,12 +130,14 @@ func (l *timeExpiredList[V]) Discard() {
 
 // run method runs the goroutine for removing expired elements.
 func (l *timeExpiredList[V]) run() {
-	timer := time.NewTimer(CleanJobInterval)
+	timer := time.NewTicker(CleanJobInterval)
 	for {
 		select {
 		case <-timer.C:
+			fmt.Println("running remove expired")
 			l.removeExpired()
 		case <-l.quitChan:
+			fmt.Println("exiting run")
 			return
 		}
 	}
@@ -147,7 +150,8 @@ func (l *timeExpiredList[V]) removeExpired() {
 	defer l.Unlock()
 	for _, val := range l.data {
 		if val.expiredAt.After(time.Now()) {
-			newData = append(newData, val)
+			//newData = append(newData, val)
+			newData = append(newData, expiredElement[V]{data: val.data, expiredAt: val.expiredAt})
 		}
 	}
 	l.data = newData
@@ -259,7 +263,7 @@ func (m *timeExpiredMap[K, V]) Discard() {
 
 // run method runs the goroutine for removing expired elements.
 func (m *timeExpiredMap[K, V]) run() {
-	timer := time.NewTimer(CleanJobInterval)
+	timer := time.NewTicker(CleanJobInterval)
 	for {
 		select {
 		case <-timer.C:
