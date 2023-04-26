@@ -130,10 +130,12 @@ func (l *timeExpiredList[V]) Discard() {
 
 // run method runs the goroutine for removing expired elements.
 func (l *timeExpiredList[V]) run() {
-	timer := time.NewTicker(CleanJobInterval)
+	ticker := time.NewTicker(CleanJobInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
-		case <-timer.C:
+		case <-ticker.C:
 			fmt.Println("running remove expired")
 			l.removeExpired()
 		case <-l.quitChan:
@@ -263,10 +265,12 @@ func (m *timeExpiredMap[K, V]) Discard() {
 
 // run method runs the goroutine for removing expired elements.
 func (m *timeExpiredMap[K, V]) run() {
-	timer := time.NewTicker(CleanJobInterval)
+	ticker := time.NewTicker(CleanJobInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
-		case <-timer.C:
+		case <-ticker.C:
 			m.removeExpired()
 		case <-m.quitChan:
 			return

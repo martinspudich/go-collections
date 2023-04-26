@@ -17,6 +17,7 @@ func BenchmarkTimeExpiredList(b *testing.B) {
 }
 
 func BenchmarkSlice(b *testing.B) {
+	b.ReportAllocs()
 	var list []string
 	for i := 0; i < b.N; i++ {
 		list = append(list, fmt.Sprintf("test-%d", i))
