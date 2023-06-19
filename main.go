@@ -219,11 +219,11 @@ func (m *timeExpiredMap[K, V]) AddWithDuration(key K, data V, duration time.Dura
 // Get method returns element by key.
 func (m *timeExpiredMap[K, V]) Get(key K) (V, error) {
 	var result V
-	m.Lock()
-	defer m.Unlock()
 	if !m.Contains(key) {
 		return result, ErrKeyNotFound
 	}
+	m.Lock()
+	defer m.Unlock()
 	if m.data[key].expiredAt.Before(time.Now()) {
 		return result, ErrExpired
 	}
