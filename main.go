@@ -73,6 +73,8 @@ func (l *timeExpiredList[V]) Add(value V) {
 // Get returns element by index.
 func (l *timeExpiredList[V]) Get(i int) (V, error) {
 	var result V
+	l.Lock()
+	defer l.Unlock()
 	if i < 0 && i >= len(l.data) {
 		return result, ErrIndexOutOfBound
 	}
@@ -86,6 +88,8 @@ func (l *timeExpiredList[V]) Get(i int) (V, error) {
 // GetAll returns TimeExpiredElements values in slice.
 func (l *timeExpiredList[V]) GetAll() []V {
 	var result []V
+	l.Lock()
+	defer l.Unlock()
 	for _, v := range l.data {
 		if v.expiredAt.Before(time.Now()) {
 			// skip element if expired.
@@ -111,6 +115,8 @@ func (l *timeExpiredList[V]) Del(i int) error {
 // Size returns size of the list
 func (l *timeExpiredList[V]) Size() int {
 	var count = 0
+	l.Lock()
+	defer l.Unlock()
 	for _, e := range l.data {
 		// Don't count if element already expired.
 		if e.expiredAt.After(time.Now()) {
@@ -213,6 +219,8 @@ func (m *timeExpiredMap[K, V]) AddWithDuration(key K, data V, duration time.Dura
 // Get method returns element by key.
 func (m *timeExpiredMap[K, V]) Get(key K) (V, error) {
 	var result V
+	m.Lock()
+	defer m.Unlock()
 	if !m.Contains(key) {
 		return result, ErrKeyNotFound
 	}
@@ -235,6 +243,8 @@ func (m *timeExpiredMap[K, V]) Del(key K) error {
 
 // Contains method returns true if key is in the map. Else return false.
 func (m *timeExpiredMap[K, V]) Contains(key K) bool {
+	m.Lock()
+	defer m.Unlock()
 	e, found := m.data[key]
 	if e.expiredAt.Before(time.Now()) {
 		// if element expire, then return false
@@ -246,6 +256,8 @@ func (m *timeExpiredMap[K, V]) Contains(key K) bool {
 // Size method returns size of the map.
 func (m *timeExpiredMap[K, V]) Size() int {
 	var count = 0
+	m.Lock()
+	defer m.Unlock()
 	for _, d := range m.data {
 		// Don't count if element already expired.
 		if d.expiredAt.After(time.Now()) {
