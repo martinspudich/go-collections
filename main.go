@@ -39,7 +39,7 @@ type TimeExpiredList[V any] interface {
 }
 
 type timeExpiredList[V any] struct {
-	sync.Mutex
+	mu         sync.Mutex
 	duration   time.Duration
 	data       []expiredElement[V]
 	dataString []V
@@ -63,8 +63,8 @@ func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
 
 // Add method add element to TimeExpiredList
 func (l *timeExpiredList[V]) Add(value V) {
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	//l.dataString = append(l.dataString, value)
 	l.data = append(l.data, expiredElement[V]{expiredAt: time.Now().Add(l.duration), data: value})
 	//l.data = append(l.data, expiredElement[V]{})
@@ -73,8 +73,8 @@ func (l *timeExpiredList[V]) Add(value V) {
 // Get returns element by index.
 func (l *timeExpiredList[V]) Get(i int) (V, error) {
 	var result V
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if i < 0 && i >= len(l.data) {
 		return result, ErrIndexOutOfBound
 	}
@@ -88,8 +88,8 @@ func (l *timeExpiredList[V]) Get(i int) (V, error) {
 // GetAll returns TimeExpiredElements values in slice.
 func (l *timeExpiredList[V]) GetAll() []V {
 	var result []V
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, v := range l.data {
 		if v.expiredAt.Before(time.Now()) {
 			// skip element if expired.
@@ -106,8 +106,8 @@ func (l *timeExpiredList[V]) Del(i int) error {
 		return ErrIndexOutOfBound
 	}
 
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.data = append(l.data[:i], l.data[i+1:]...)
 	return nil
 }
@@ -115,8 +115,8 @@ func (l *timeExpiredList[V]) Del(i int) error {
 // Size returns size of the list
 func (l *timeExpiredList[V]) Size() int {
 	var count = 0
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, e := range l.data {
 		// Don't count if element already expired.
 		if e.expiredAt.After(time.Now()) {
@@ -129,8 +129,8 @@ func (l *timeExpiredList[V]) Size() int {
 // Discard method stops the goroutine for removing elements and discards data in internal slice.
 func (l *timeExpiredList[V]) Discard() {
 	l.quitChan <- struct{}{}
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.data = nil
 }
 
@@ -154,8 +154,8 @@ func (l *timeExpiredList[V]) run() {
 // removeExpired method removes expired elements in list.
 func (l *timeExpiredList[V]) removeExpired() {
 	var newData []expiredElement[V]
-	l.Lock()
-	defer l.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, val := range l.data {
 		if val.expiredAt.After(time.Now()) {
 			//newData = append(newData, val)
@@ -183,7 +183,7 @@ type TimeExpiredMap[K comparable, V any] interface {
 }
 
 type timeExpiredMap[K comparable, V any] struct {
-	sync.Mutex
+	mu       sync.Mutex
 	duration time.Duration           // default element duration
 	data     map[K]expiredElement[V] // map of elements
 	quitChan chan struct{}           // channel for indicating to end goroutines for removing expired elements
@@ -204,15 +204,15 @@ func NewTimeExpiredMap[K comparable, V any](duration time.Duration) TimeExpiredM
 
 // Add method adds element to the map with key.
 func (m *timeExpiredMap[K, V]) Add(key K, data V) {
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.data[key] = expiredElement[V]{expiredAt: time.Now().Add(m.duration), data: data}
 }
 
 // AddWithDuration adds element to the map with key. It will set custom duration time of the element in the internal map.
 func (m *timeExpiredMap[K, V]) AddWithDuration(key K, data V, duration time.Duration) {
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.data[key] = expiredElement[V]{expiredAt: time.Now().Add(duration), data: data}
 }
 
@@ -222,8 +222,8 @@ func (m *timeExpiredMap[K, V]) Get(key K) (V, error) {
 	if !m.Contains(key) {
 		return result, ErrKeyNotFound
 	}
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.data[key].expiredAt.Before(time.Now()) {
 		return result, ErrExpired
 	}
@@ -235,16 +235,16 @@ func (m *timeExpiredMap[K, V]) Del(key K) error {
 	if !m.Contains(key) {
 		return ErrKeyNotFound
 	}
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	delete(m.data, key)
 	return nil
 }
 
 // Contains method returns true if key is in the map. Else return false.
 func (m *timeExpiredMap[K, V]) Contains(key K) bool {
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	e, found := m.data[key]
 	if e.expiredAt.Before(time.Now()) {
 		// if element expire, then return false
@@ -256,8 +256,8 @@ func (m *timeExpiredMap[K, V]) Contains(key K) bool {
 // Size method returns size of the map.
 func (m *timeExpiredMap[K, V]) Size() int {
 	var count = 0
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, d := range m.data {
 		// Don't count if element already expired.
 		if d.expiredAt.After(time.Now()) {
@@ -270,8 +270,8 @@ func (m *timeExpiredMap[K, V]) Size() int {
 // Discard method stops the goroutine for removing elements and discards data in internal map.
 func (m *timeExpiredMap[K, V]) Discard() {
 	m.quitChan <- struct{}{}
-	m.Lock()
-	defer m.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.data = nil
 }
 
