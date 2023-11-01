@@ -124,6 +124,29 @@ func TestTimeExpiredList_Del(t *testing.T) {
 	}
 }
 
+func TestTimeExpiredList_Clear(t *testing.T) {
+	t.Parallel()
+
+	tlist := NewTimeExpiredList[string](600 * time.Second)
+	defer tlist.Discard()
+
+	// Add items to the list.
+	tlist.Add("value1")
+	tlist.Add("value2")
+	tlist.Add("value3")
+	tlist.Add("value4")
+	tlist.Add("value5")
+
+	if tlist.Size() != 5 {
+		t.Errorf("Size should be 5, but was: %d", tlist.Size())
+	}
+
+	tlist.Clear()
+	if tlist.Size() != 0 {
+		t.Errorf("List size after clear should be 0, but was: %d", tlist.Size())
+	}
+}
+
 func TestTimeExpiredMap(t *testing.T) {
 	t.Parallel()
 	var want int
@@ -261,5 +284,27 @@ func TestTimeExpiredMap_AddWithDuration(t *testing.T) {
 	got = tmap.Size()
 	if want != got {
 		t.Errorf("want: %d, got: %d", want, got)
+	}
+}
+
+func TestTimeExpiredMap_Clear(t *testing.T) {
+	t.Parallel()
+	var want int
+	var got int
+
+	tmap := NewTimeExpiredMap[string, string](10 * time.Second)
+	defer tmap.Discard()
+
+	tmap.Add("1", "test 1")
+
+	want = 1
+	got = tmap.Size()
+	if want != got {
+		t.Errorf("want: %d, got: %d", want, got)
+	}
+
+	tmap.Clear()
+	if tmap.Size() > 0 {
+		t.Errorf("map is not cleared.")
 	}
 }

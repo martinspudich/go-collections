@@ -53,3 +53,12 @@ func BenchmarkTimeExpiredList_Size(b *testing.B) {
 	}
 	tlist.Size()
 }
+
+func BenchmarkTimeExpiredMap_Clear(b *testing.B) {
+	tmap := NewTimeExpiredMap[string, string](5 * time.Second)
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("test-%d", i)
+		tmap.Add(key, key)
+	}
+	tmap.Clear()
+}

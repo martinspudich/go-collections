@@ -34,6 +34,7 @@ type TimeExpiredList[V any] interface {
 	Get(index int) (V, error)
 	GetAll() []V
 	Del(i int) error
+	Clear()
 	Discard()
 	Size() int
 }
@@ -65,9 +66,7 @@ func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
 func (l *timeExpiredList[V]) Add(value V) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	//l.dataString = append(l.dataString, value)
 	l.data = append(l.data, expiredElement[V]{expiredAt: time.Now().Add(l.duration), data: value})
-	//l.data = append(l.data, expiredElement[V]{})
 }
 
 // Get returns element by index.
@@ -126,6 +125,13 @@ func (l *timeExpiredList[V]) Size() int {
 	return count
 }
 
+// Clear method clears all elements from the list.
+func (l *timeExpiredList[V]) Clear() {
+	l.mu.Lock()
+	l.mu.Unlock()
+	l.data = []expiredElement[V]{}
+}
+
 // Discard method stops the goroutine for removing elements and discards data in internal slice.
 func (l *timeExpiredList[V]) Discard() {
 	l.quitChan <- struct{}{}
@@ -179,6 +185,7 @@ type TimeExpiredMap[K comparable, V any] interface {
 	Del(key K) error
 	Contains(key K) bool
 	Size() int
+	Clear()
 	Discard()
 }
 
@@ -265,6 +272,14 @@ func (m *timeExpiredMap[K, V]) Size() int {
 		}
 	}
 	return count
+}
+
+// Clear function clear all elements from map.
+func (m *timeExpiredMap[K, V]) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.data = make(map[K]expiredElement[V])
 }
 
 // Discard method stops the goroutine for removing elements and discards data in internal map.
