@@ -307,6 +307,8 @@ func (m *timeExpiredMap[K, V]) run() {
 
 // removeExpired method removes expired elements.
 func (m *timeExpiredMap[K, V]) removeExpired() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for key, val := range m.data {
 		if val.expiredAt.Before(time.Now()) {
 			delete(m.data, key)

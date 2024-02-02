@@ -3,6 +3,7 @@ package gocollections
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -306,5 +307,21 @@ func TestTimeExpiredMap_Clear(t *testing.T) {
 	tmap.Clear()
 	if tmap.Size() > 0 {
 		t.Errorf("map is not cleared.")
+	}
+}
+
+func TestTimeExpiredMap_ClearExeption(t *testing.T) {
+	t.Parallel()
+	tmap := NewTimeExpiredMap[int, int](1 * time.Second)
+	defer tmap.Discard()
+
+	startTime := time.Now()
+	i := 0
+	for {
+		tmap.Add(i, rand.Int())
+		i++
+		if time.Now().Sub(startTime) > 10*time.Second {
+			break
+		}
 	}
 }
