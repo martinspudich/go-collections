@@ -158,25 +158,18 @@ func TestTimeExpiredList_ExpiredElChan(t *testing.T) {
 	defer tlist.Discard()
 
 	// Add item
-	go func() {
-		for i := 0; i < 10; i++ {
-			tlist.Add(fmt.Sprintf("value_%d", i))
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
+	tlist.Add("value_1")
 
 	timeout := time.After(1 * time.Second)
 
 	exElChan := tlist.ExpiredElChan()
 
-	for {
-		select {
-		case el := <-exElChan:
-			fmt.Println("Element", el)
-		case <-timeout:
-			t.Error("No expired element in timeout")
-			return
-		}
+	select {
+	case el := <-exElChan:
+		fmt.Println("Element", el)
+	case <-timeout:
+		t.Error("No expired element in timeout")
+		return
 	}
 }
 

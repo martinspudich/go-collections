@@ -189,7 +189,7 @@ func (l *timeExpiredList[V]) removeExpired() {
 			newData = append(newData, expiredElement[V]{data: val.data, expiredAt: val.expiredAt})
 		} else {
 			// If expired element channel is defined and size is bigger than 0, than send expired element to this channel.
-			if len(l.expiredElChan) > 0 {
+			if cap(l.expiredElChan) > 0 {
 				if len(l.expiredElChan) >= l.config.ExpiredElChanSize {
 					// If expired element channel is full then remove first element.
 					<-l.expiredElChan
@@ -364,7 +364,7 @@ func (m *timeExpiredMap[K, V]) removeExpired() {
 	for key, val := range m.data {
 		if val.expiredAt.Before(time.Now()) {
 			// If expired element channel is defined and size is bigger than 0, than send expired element to this channel.
-			if len(m.expiredElChan) > 0 {
+			if cap(m.expiredElChan) > 0 {
 				if len(m.expiredElChan) >= m.config.ExpiredElChanSize {
 					// If expired element channel is full then remove first element.
 					<-m.expiredElChan
