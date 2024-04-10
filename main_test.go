@@ -148,6 +148,38 @@ func TestTimeExpiredList_Clear(t *testing.T) {
 	}
 }
 
+func TestTimeExpiredList_ExpiredElChan(t *testing.T) {
+	t.Parallel()
+
+	tlist := NewTimeExpiredList[string](100*time.Millisecond, Config{
+		CleanJobInterval:  200 * time.Millisecond,
+		ExpiredElChanSize: 1,
+	})
+	defer tlist.Discard()
+
+	// Add item
+	go func() {
+		for i := 0; i < 10; i++ {
+			tlist.Add(fmt.Sprintf("value_%d", i))
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+
+	timeout := time.After(1 * time.Second)
+
+	exElChan := tlist.ExpiredElChan()
+
+	for {
+		select {
+		case el := <-exElChan:
+			fmt.Println("Element", el)
+		case <-timeout:
+			t.Error("No expired element in timeout")
+			return
+		}
+	}
+}
+
 func TestTimeExpiredMap(t *testing.T) {
 	t.Parallel()
 	var want int
@@ -323,5 +355,30 @@ func TestTimeExpiredMap_ClearExeption(t *testing.T) {
 		if time.Now().Sub(startTime) > 10*time.Second {
 			break
 		}
+	}
+}
+
+func TestTimeExpiredMap_ExpiredElChan(t *testing.T) {
+	t.Parallel()
+
+	tmap := NewTimeExpiredMap[string, string](100*time.Millisecond, Config{
+		CleanJobInterval:  200 * time.Millisecond,
+		ExpiredElChanSize: 100,
+	})
+	defer tmap.Discard()
+
+	// Add item
+	tmap.Add("key_1", "value_1")
+
+	timeout := time.After(1 * time.Second)
+
+	exElChan := tmap.ExpiredElChan()
+
+	select {
+	case el := <-exElChan:
+		fmt.Println("Element", el)
+	case <-timeout:
+		t.Error("No expired element in timeout")
+		return
 	}
 }

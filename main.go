@@ -2,15 +2,8 @@ package gocollections
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
-)
-
-const (
-	// CleanJobInterval How often remove expired elements from collections. If it's too often, ex. 1 second and there
-	// is too many elements, than it will cause performance issue.
-	CleanJobInterval = 60 * time.Second
 )
 
 var (
@@ -22,6 +15,15 @@ var (
 type expiredElement[V any] struct {
 	data      V
 	expiredAt time.Time
+}
+
+// Config struct is for configuration List or Map options.
+type Config struct {
+	// CleanJobInterval How often remove expired elements from collections. If it's too often, ex. 1 second and there
+	// is too many elements, than it will cause performance issue.
+	CleanJobInterval time.Duration
+	// Size of expired element channel. If channel is full then last is removed before new is added.
+	ExpiredElChanSize int
 }
 
 /*
@@ -37,23 +39,40 @@ type TimeExpiredList[V any] interface {
 	Clear()
 	Discard()
 	Size() int
+	ExpiredElChan() chan expiredElement[V]
 }
 
 type timeExpiredList[V any] struct {
-	mu         sync.Mutex
-	duration   time.Duration
-	data       []expiredElement[V]
-	dataString []V
-	quitChan   chan struct{}
+	config        Config
+	mu            sync.Mutex
+	duration      time.Duration
+	data          []expiredElement[V]
+	dataString    []V
+	expiredElChan chan expiredElement[V]
+	quitChan      chan struct{}
 }
 
 // NewTimeExpiredList creates instance of TimeExpiredList interface. It runs goroutine for removing expired elements.
-func NewTimeExpiredList[V any](duration time.Duration) TimeExpiredList[V] {
+func NewTimeExpiredList[V any](duration time.Duration, configs ...Config) TimeExpiredList[V] {
+	var config Config
+	if len(configs) < 1 {
+		// Default config if not provided
+		config = Config{
+			CleanJobInterval:  60 * time.Second,
+			ExpiredElChanSize: 0,
+		}
+	} else {
+		// Or use provided configuration
+		config = configs[0]
+	}
+
 	tlist := &timeExpiredList[V]{
-		duration:   duration,
-		data:       []expiredElement[V]{},
-		dataString: []V{},
-		quitChan:   make(chan struct{}),
+		config:        config,
+		duration:      duration,
+		data:          []expiredElement[V]{},
+		dataString:    []V{},
+		expiredElChan: make(chan expiredElement[V], config.ExpiredElChanSize),
+		quitChan:      make(chan struct{}),
 	}
 
 	// Run goroutine for removing expired elements.
@@ -140,18 +159,20 @@ func (l *timeExpiredList[V]) Discard() {
 	l.data = nil
 }
 
+func (l *timeExpiredList[V]) ExpiredElChan() chan expiredElement[V] {
+	return l.expiredElChan
+}
+
 // run method runs the goroutine for removing expired elements.
 func (l *timeExpiredList[V]) run() {
-	ticker := time.NewTicker(CleanJobInterval)
+	ticker := time.NewTicker(l.config.CleanJobInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Println("running remove expired")
 			l.removeExpired()
 		case <-l.quitChan:
-			fmt.Println("exiting run")
 			return
 		}
 	}
@@ -164,8 +185,18 @@ func (l *timeExpiredList[V]) removeExpired() {
 	defer l.mu.Unlock()
 	for _, val := range l.data {
 		if val.expiredAt.After(time.Now()) {
-			//newData = append(newData, val)
+			// If Element is not expired then add to new data slice.
 			newData = append(newData, expiredElement[V]{data: val.data, expiredAt: val.expiredAt})
+		} else {
+			// If expired element channel is defined and size is bigger than 0, than send expired element to this channel.
+			if len(l.expiredElChan) > 0 {
+				if len(l.expiredElChan) >= l.config.ExpiredElChanSize {
+					// If expired element channel is full then remove first element.
+					<-l.expiredElChan
+				}
+				// If Element is expired then add to expired channel.
+				l.expiredElChan <- val
+			}
 		}
 	}
 	l.data = newData
@@ -187,21 +218,38 @@ type TimeExpiredMap[K comparable, V any] interface {
 	Size() int
 	Clear()
 	Discard()
+	ExpiredElChan() chan expiredElement[V]
 }
 
 type timeExpiredMap[K comparable, V any] struct {
-	mu       sync.Mutex
-	duration time.Duration           // default element duration
-	data     map[K]expiredElement[V] // map of elements
-	quitChan chan struct{}           // channel for indicating to end goroutines for removing expired elements
+	config        Config
+	mu            sync.Mutex
+	duration      time.Duration           // default element duration
+	data          map[K]expiredElement[V] // map of elements
+	expiredElChan chan expiredElement[V]
+	quitChan      chan struct{} // channel for indicating to end goroutines for removing expired elements
 }
 
 // NewTimeExpiredMap creates new TimeExpiredMap object.
-func NewTimeExpiredMap[K comparable, V any](duration time.Duration) TimeExpiredMap[K, V] {
+func NewTimeExpiredMap[K comparable, V any](duration time.Duration, configs ...Config) TimeExpiredMap[K, V] {
+	var config Config
+	if len(configs) < 1 {
+		// Default config if not provided
+		config = Config{
+			CleanJobInterval:  60 * time.Second,
+			ExpiredElChanSize: 100,
+		}
+	} else {
+		// Or use provided configuration
+		config = configs[0]
+	}
+
 	tmap := &timeExpiredMap[K, V]{
-		duration: duration,
-		data:     make(map[K]expiredElement[V]),
-		quitChan: make(chan struct{}),
+		config:        config,
+		duration:      duration,
+		data:          make(map[K]expiredElement[V]),
+		expiredElChan: make(chan expiredElement[V], config.ExpiredElChanSize),
+		quitChan:      make(chan struct{}),
 	}
 
 	go tmap.run()
@@ -290,9 +338,13 @@ func (m *timeExpiredMap[K, V]) Discard() {
 	m.data = nil
 }
 
+func (m *timeExpiredMap[K, V]) ExpiredElChan() chan expiredElement[V] {
+	return m.expiredElChan
+}
+
 // run method runs the goroutine for removing expired elements.
 func (m *timeExpiredMap[K, V]) run() {
-	ticker := time.NewTicker(CleanJobInterval)
+	ticker := time.NewTicker(m.config.CleanJobInterval)
 	defer ticker.Stop()
 
 	for {
@@ -311,6 +363,16 @@ func (m *timeExpiredMap[K, V]) removeExpired() {
 	defer m.mu.Unlock()
 	for key, val := range m.data {
 		if val.expiredAt.Before(time.Now()) {
+			// If expired element channel is defined and size is bigger than 0, than send expired element to this channel.
+			if len(m.expiredElChan) > 0 {
+				if len(m.expiredElChan) >= m.config.ExpiredElChanSize {
+					// If expired element channel is full then remove first element.
+					<-m.expiredElChan
+				}
+				// Send expired element to expired element channel.
+				m.expiredElChan <- m.data[key]
+			}
+			// Delete element from map.
 			delete(m.data, key)
 		}
 	}
