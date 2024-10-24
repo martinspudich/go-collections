@@ -72,6 +72,9 @@ func main() {
 
 ### RELEASE NOTES
 
+#### 0.5.0
+* Add `CopyMap` helper function.
+
 #### 0.4.0
 * Add expired element channel
   * to this channel we add expired elements, when elements expired
