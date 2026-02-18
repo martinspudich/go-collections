@@ -44,7 +44,7 @@ type TimeExpiredList[V any] interface {
 
 type timeExpiredList[V any] struct {
 	config      Config
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	duration    time.Duration
 	data        []expiredElement[V]
 	dataString  []V
@@ -91,8 +91,8 @@ func (l *timeExpiredList[V]) Add(value V) {
 // Get returns element by index.
 func (l *timeExpiredList[V]) Get(i int) (V, error) {
 	var result V
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	if i < 0 && i >= len(l.data) {
 		return result, ErrIndexOutOfBound
 	}
@@ -106,8 +106,8 @@ func (l *timeExpiredList[V]) Get(i int) (V, error) {
 // GetAll returns TimeExpiredElements values in slice.
 func (l *timeExpiredList[V]) GetAll() []V {
 	var result []V
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	for _, v := range l.data {
 		if v.expiredAt.Before(time.Now()) {
 			// skip element if expired.
@@ -133,8 +133,8 @@ func (l *timeExpiredList[V]) Del(i int) error {
 // Size returns size of the list
 func (l *timeExpiredList[V]) Size() int {
 	var count = 0
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	for _, e := range l.data {
 		// Don't count if element already expired.
 		if e.expiredAt.After(time.Now()) {
@@ -223,7 +223,7 @@ type TimeExpiredMap[K comparable, V any] interface {
 
 type timeExpiredMap[K comparable, V any] struct {
 	config      Config
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	duration    time.Duration           // default element duration
 	data        map[K]expiredElement[V] // map of elements
 	expiredChan chan V
@@ -277,8 +277,8 @@ func (m *timeExpiredMap[K, V]) Get(key K) (V, error) {
 	if !m.Contains(key) {
 		return result, ErrKeyNotFound
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.data[key].expiredAt.Before(time.Now()) {
 		return result, ErrExpired
 	}
@@ -298,8 +298,8 @@ func (m *timeExpiredMap[K, V]) Del(key K) error {
 
 // Contains method returns true if key is in the map. Else return false.
 func (m *timeExpiredMap[K, V]) Contains(key K) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	e, found := m.data[key]
 	if e.expiredAt.Before(time.Now()) {
 		// if element expire, then return false
@@ -311,8 +311,8 @@ func (m *timeExpiredMap[K, V]) Contains(key K) bool {
 // Size method returns size of the map.
 func (m *timeExpiredMap[K, V]) Size() int {
 	var count = 0
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	for _, d := range m.data {
 		// Don't count if element already expired.
 		if d.expiredAt.After(time.Now()) {

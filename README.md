@@ -72,6 +72,9 @@ func main() {
 
 ### RELEASE NOTES
 
+#### 0.5.1
+* Improve performance with RLock/RUnlock
+
 #### 0.5.0
 * Add `CopyMap` helper function.
 
