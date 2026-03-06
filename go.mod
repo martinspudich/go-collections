@@ -1,3 +1,3 @@
 module github.com/martinspudich/go-collections
 
-go 1.19
+go 1.25
